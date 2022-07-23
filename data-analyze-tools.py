@@ -55,3 +55,58 @@ def cat_summary(dataframe, col_name,plot=False):
 
 def target_summary_with_cat(dataframe,target,categorical_col):
     print(pd.DataFrame({"TARGET_MEAN":dataframe.groupby(categorical_col)[target].mean()}),end="\n\n\n")
+
+    
+def high_correlated_cols(dataframe, plot=False, corr_th=0.90):
+    corr = dataframe.corr()
+    cor_matrix = corr.abs()
+    upper_triangle_matrix = cor_matrix.where(np.triu(np.ones(cor_matrix.shape), k=1).astype(bool))
+    drop_list = [col for col in upper_triangle_matrix.columns if any(upper_triangle_matrix[col] > corr_th)]
+    if plot:
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        sns.set(rc={'figure.figsize': (15, 15)})
+        sns.heatmap(corr, cmap="RdBu")
+        plt.show()
+    return drop_list
+
+def outlier_thresholds(dataframe,col_name,q1=0.25,q3=0.75):
+    quartile1 = dataframe[col_name].quantile(q1)
+    quartile3 = dataframe[col_name].quantile(q3)
+    iqr = quartile3 - quartile1
+    low_limit = quartile1 - 1.5*iqr
+    up_limit = quartile3 + 1.5*iqr
+    return low_limit,up_limit
+
+def check_outlier(dataframe,col_name):
+    low,up = outlier_thresholds(dataframe,col_name)
+    if dataframe[(dataframe[col_name] < low) | (dataframe[col_name]>up)].any(axis=None):
+        return True
+    else:
+        return False
+
+def grab_outliers(dataframe,col,index=False):
+    low,up = outlier_thresholds(dataframe,col)
+    if not dataframe[(dataframe[col] < low) | (dataframe[col] > up)].any(axis=None):
+        print("There is no outlier")
+        return 0
+    if dataframe[(dataframe[col] < low) | (dataframe[col] > up)].shape[0] > 10:
+        print(dataframe[(dataframe[col] < low) | (dataframe[col] > up)].head())
+    else:
+        print(dataframe[(dataframe[col] < low) | (dataframe[col] > up)])
+    if index:
+        return dataframe[(dataframe[col] < low) | (dataframe[col] > up)].index
+ 
+
+def remove_outlier(dataframe,col):
+    low,up = outlier_thresholds(dataframe,col)
+    df_without_outliers = dataframe[~((df[col] < low) | (df[col]>up))]
+    return df_without_outliers
+
+def replace_with_thresholds(dataframe,col):
+    low,up = outlier_thresholds(dataframe,col)
+    dataframe.loc[(dataframe[col] > up),col] = up
+    dataframe.loc[(dataframe[col] < low),col] = low
+
+    
+   
