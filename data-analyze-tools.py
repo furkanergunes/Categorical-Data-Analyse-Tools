@@ -114,6 +114,59 @@ def replace_with_thresholds(dataframe,col):
     low,up = outlier_thresholds(dataframe,col)
     dataframe.loc[(dataframe[col] > up),col] = up
     dataframe.loc[(dataframe[col] < low),col] = low
-
     
+def missing_values_table(dataframe,na_name=False):
+    na_columns = [col for col in dataframe.columns if dataframe[col].isnull().sum() > 0]
+    n_miss = dataframe[na_columns].isnull().sum().sort_values(ascending=False)
+    ratio = (dataframe[na_columns].isnull().sum() / dataframe.shape[0] * 100).sort_values(ascending=False)
+    missing_df = pd.concat([n_miss,np.round(ratio,2)],axis=1,keys=['n_miss','ratio'])
+    print(missing_df,end="\n")
+
+    if na_name:
+        return na_columns
+ 
+def missing_vs_target(dataframe, target, na_columns):
+    temp_df = dataframe.copy()
+
+    for col in na_columns:
+        temp_df[col + '_NA_FLAG'] = np.where(temp_df[col].isnull(), 1, 0)
+
+    na_flags = temp_df.loc[:, temp_df.columns.str.contains("_NA_")].columns
+
+    for col in na_flags:
+        print(pd.DataFrame({"TARGET_MEAN": temp_df.groupby(col)[target].mean(),
+                            "Count": temp_df.groupby(col)[target].count()}), end="\n\n\n")
+  
+
+def label_encoder(dataframe,binary_col):
+    labelencoder = LabelEncoder()
+    dataframe[binary_col] = labelencoder.fit_transform(dataframe[binary_col])
+    return dataframe
+
+
+
+def one_hot_encoder(dataframe,categorical_cols,drop_first=True):
+    dataframe = pd.get_dummies(dataframe,columns=categorical_cols,drop_first=drop_first)
+    return dataframe
    
+    
+def rare_analyser(dataframe,target,cat_cols):
+    for col in cat_cols:
+        print(col, ":" , len(dataframe[col].value_counts()))
+        print(pd.DataFrame({"COUNT": dataframe[col].value_counts(),
+                            "RATIO": dataframe[col].value_counts()/len(dataframe),
+                            "TARGET_MEAN": dataframe.groupby(col)[target].mean()}),end="\n\n\n"),
+        
+        
+def rare_encoder(dataframe, rare_perc):
+    temp_df = dataframe.copy()
+
+    rare_columns = [col for col in temp_df.columns if temp_df[col].dtypes == 'O'
+                    and (temp_df[col].value_counts() / len(temp_df) < rare_perc).any(axis=None)]
+
+    for var in rare_columns:
+        tmp = temp_df[var].value_counts() / len(temp_df)
+        rare_labels = tmp[tmp < rare_perc].index
+        temp_df[var] = np.where(temp_df[var].isin(rare_labels), 'Rare', temp_df[var])
+
+    return temp_df
